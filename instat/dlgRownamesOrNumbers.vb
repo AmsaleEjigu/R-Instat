@@ -22,8 +22,18 @@ Public Class dlgRowNamesOrNumbers
     Private clsGetRowNamesFunction As New RFunction
     Private clsSetRowNamesFunction As New RFunction
     Private clsAddKeyFunction As New RFunction
-    Private clsAsNumericFunction As New RFunction
     Private clsDummyFunction As New RFunction
+    Private clsGetVectorFunction As New RFunction
+    Private clsHmiscFunction As New RFunction
+    Public enumRowNamesOrNumbersMode As String = RowNamesOrNumbersMode.Prepare
+
+    Public Enum RowNamesOrNumbersMode
+        Prepare
+        Tricot
+    End Enum
+
+    Private clsRemoveFilter As New RFunction
+
 
     Private Sub dlgRowNamesOrNumbers_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         If bFirstLoad Then
@@ -35,13 +45,15 @@ Public Class dlgRowNamesOrNumbers
             SetDefaults()
         End If
         SetRCodeForControls(bReset)
+        SetHelpOptions()
         bReset = False
         TestOKEnabled()
         autoTranslate(Me)
+        RemoveCurrentFilter()
     End Sub
 
     Private Sub InitialiseDialog()
-        ucrBase.iHelpTopicID = 178
+        'ucrBase.iHelpTopicID = 178
 
         ' selector
         ucrSelectorRowNames.SetParameter(New RParameter("data_name", 0))
@@ -65,7 +77,7 @@ Public Class dlgRowNamesOrNumbers
         ucrPnlOverallOptions.AddParameterValuesCondition(rdoResetintoPositiveIntegers, "checked_rdo", "reset_row")
         ucrPnlOverallOptions.AddParameterValuesCondition(rdoSortbyRowNames, "checked_rdo", "sort_row")
 
-        ucrPnlOverallOptions.AddToLinkedControls({ucrNewColumnName, ucrChkMakeColumnIntoKey}, {rdoCopyRowNamesIntoFirstColumn}, bNewLinkedAddRemoveParameter:=True, bNewLinkedHideIfParameterMissing:=True)
+        ucrPnlOverallOptions.AddToLinkedControls({ucrNewColumnName, ucrChkMakeColumnIntoKey}, {rdoCopyRowNamesIntoFirstColumn}, bNewLinkedHideIfParameterMissing:=True)
         ucrPnlOverallOptions.AddToLinkedControls(ucrReceiverRowNames, {rdoSetRowNamesFromColumn}, bNewLinkedAddRemoveParameter:=True, bNewLinkedHideIfParameterMissing:=True)
         ucrPnlOverallOptions.AddToLinkedControls(ucrPnlSortOptions, {rdoSortbyRowNames}, bNewLinkedAddRemoveParameter:=True, bNewLinkedHideIfParameterMissing:=True)
         ucrPnlOverallOptions.AddToLinkedControls(ucrChkAsNumeric, {rdoSortbyRowNames}, bNewLinkedAddRemoveParameter:=True, bNewLinkedHideIfParameterMissing:=True)
@@ -105,26 +117,36 @@ Public Class dlgRowNamesOrNumbers
         clsAddKeyFunction = New RFunction
         clsDummyFunction = New RFunction
         clsSetRowNamesFunction = New RFunction
-        clsAsNumericFunction = New RFunction
+        clsGetVectorFunction = New RFunction
+        clsHmiscFunction = New RFunction
+        clsRemoveFilter = New RFunction
+
 
         ucrNewColumnName.Reset()
         ucrSelectorRowNames.Reset()
-        ucrBase.clsRsyntax.lstAfterCodes.Clear()
+        ucrBase.clsRsyntax.GetAfterCodes().Clear()
+
+        clsRemoveFilter.SetRCommand(frmMain.clsRLink.strInstatDataObject & "$remove_current_filter")
 
         clsDummyFunction.AddParameter("checked_rdo", "copy_row", iPosition:=1)
-        clsDummyFunction.AddParameter("add_key", "FALSE", iPosition:=2)
+        clsDummyFunction.AddParameter("add_key", "TRUE", iPosition:=2)
 
         clsAddKeyFunction.SetRCommand(frmMain.clsRLink.strInstatDataObject & "$add_key")
 
-        clsAsNumericFunction.SetRCommand("as.numeric")
-        clsAsNumericFunction.AddParameter("x", clsRFunctionParameter:=clsGetRowNamesFunction, iPosition:=0)
+        clsGetVectorFunction.SetRCommand("what=c")
+        clsGetVectorFunction.AddParameter("vector", Chr(34) & "vector" & Chr(34), bIncludeArgumentName:=False)
+
+        clsHmiscFunction.SetPackageName("Hmisc")
+        clsHmiscFunction.SetRCommand("all.is.numeric")
+        clsHmiscFunction.AddParameter("row", clsRFunctionParameter:=clsGetRowNamesFunction, bIncludeArgumentName:=False, iPosition:=0)
+        clsHmiscFunction.AddParameter("vector", clsRFunctionParameter:=clsGetVectorFunction, bIncludeArgumentName:=False, iPosition:=1)
 
         clsGetRowNamesFunction.SetRCommand(frmMain.clsRLink.strInstatDataObject & "$get_row_names")
         clsGetRowNamesFunction.SetAssignTo(strTemp:=ucrNewColumnName.GetText(), strTempDataframe:=ucrSelectorRowNames.ucrAvailableDataFrames.cboAvailableDataFrames.Text, strTempColumn:=ucrNewColumnName.GetText())
 
         clsSetRowNamesFunction.SetRCommand(frmMain.clsRLink.strInstatDataObject & "$set_row_names")
-
         ucrBase.clsRsyntax.SetBaseRFunction(clsGetRowNamesFunction)
+        RemoveCurrentFilter()
     End Sub
 
     Private Sub SetRCodeForControls(bReset As Boolean)
@@ -136,8 +158,9 @@ Public Class dlgRowNamesOrNumbers
         ucrChkMakeColumnIntoKey.SetRCode(clsDummyFunction, bReset)
         ucrPnlOverallOptions.SetRCode(clsDummyFunction, bReset)
         ucrNewColumnName.AddAdditionalRCode(clsGetRowNamesFunction, bReset)
-        ucrNewColumnName.SetRCode(clsAsNumericFunction, bReset)
+        ucrNewColumnName.SetRCode(clsHmiscFunction, bReset)
         ucrChkAsNumeric.SetRCode(ucrBase.clsRsyntax.clsBaseFunction, bReset)
+
     End Sub
 
     Private Sub TestOKEnabled()
@@ -163,7 +186,7 @@ Public Class dlgRowNamesOrNumbers
         Else
             ucrSelectorRowNames.SetVariablesVisible(False)
             If rdoCopyRowNamesIntoFirstColumn.Checked Then
-                ucrBase.clsRsyntax.SetBaseRFunction(clsAsNumericFunction)
+                ucrBase.clsRsyntax.SetBaseRFunction(clsHmiscFunction)
                 clsDummyFunction.AddParameter("checked_rdo", "copy_row", iPosition:=1)
             ElseIf rdoResetintoPositiveIntegers.Checked Then
                 ucrBase.clsRsyntax.SetBaseRFunction(clsSetRowNamesFunction)
@@ -174,6 +197,16 @@ Public Class dlgRowNamesOrNumbers
             End If
         End If
         AddRemoveKeyFromAfterCodes()
+        RemoveCurrentFilter()
+    End Sub
+
+    Private Sub SetHelpOptions()
+        Select Case enumRowNamesOrNumbersMode
+            Case RowNamesOrNumbersMode.Prepare
+                ucrBase.iHelpTopicID = 178
+            Case RowNamesOrNumbersMode.Tricot
+                ucrBase.iHelpTopicID = 745
+        End Select
     End Sub
 
     Private Sub AddRemoveKeyFromAfterCodes()
@@ -190,15 +223,31 @@ Public Class dlgRowNamesOrNumbers
 
     Private Sub ucrChkMakeColumnIntoKey_ControlValueChanged(ucrChangedControl As ucrCore) Handles ucrChkMakeColumnIntoKey.ControlValueChanged
         AddRemoveKeyFromAfterCodes()
+        RemoveCurrentFilter()
     End Sub
 
     Private Sub ucrNewColumnName_ControlValueChanged(ucrChangedControl As ucrCore) Handles ucrNewColumnName.ControlValueChanged
         clsAddKeyFunction.AddParameter("col_names", Chr(34) & ucrNewColumnName.GetText & Chr(34), iPosition:=1)
+        ucrNewColumnName.SetAssignToBooleans(bTempInsertColumnBefore:=True)
     End Sub
 
     Private Sub CoreControls_ControlContentsChanged(ucrChangedControl As ucrCore) Handles ucrSelectorRowNames.ControlContentsChanged,
         ucrPnlOverallOptions.ControlContentsChanged, ucrReceiverRowNames.ControlContentsChanged, ucrNewColumnName.ControlContentsChanged
         TestOKEnabled()
+    End Sub
+
+    Private Sub ucrSelectorRowNames_DataFrameChanged() Handles ucrSelectorRowNames.DataFrameChanged
+        Dim strDataFrame As String = Chr(34) & ucrSelectorRowNames.ucrAvailableDataFrames.cboAvailableDataFrames.Text & Chr(34)
+        clsRemoveFilter.AddParameter("data_name", strDataFrame, iPosition:=0)
+
+    End Sub
+
+    Private Sub RemoveCurrentFilter()
+        If frmMain.ucrDataViewer.GetCurrentDataFrameFocus.clsFilterOrColumnSelection.bFilterApplied Then
+            ucrBase.clsRsyntax.AddToBeforeCodes(clsRemoveFilter, iPosition:=0)
+        Else
+            ucrBase.clsRsyntax.RemoveFromBeforeCodes(clsRemoveFilter)
+        End If
     End Sub
 
 End Class

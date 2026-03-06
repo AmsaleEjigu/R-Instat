@@ -25,6 +25,7 @@ Public Class dlgFromLibrary
     Private bReset As Boolean = True
     Private clsDataFunction As New RFunction
     Private dctPackages As New Dictionary(Of String, String)
+    Private clsRemoveFunction As New RFunction
 
     'a string array that holds the packages displayed in the combobox 
     'todo. this property can be removed once the PR that enhances the inputCombobox control is merged
@@ -65,6 +66,7 @@ Public Class dlgFromLibrary
 
         lstCollection.HideSelection = False
 
+        clsGetPackages.SetPackageName("instatExtras")
         clsGetPackages.SetRCommand("get_installed_packages_with_data")
         expPackageNames = frmMain.clsRLink.RunInternalScriptGetValue(clsGetPackages.ToScript(), bSilent:=True)
         If expPackageNames IsNot Nothing AndAlso expPackageNames.Type <> Internals.SymbolicExpressionType.Null Then
@@ -103,6 +105,8 @@ Public Class dlgFromLibrary
         clsDataFunction.SetRCommand("data")
         clsDataFunction.AddParameter("package", Chr(34) & "datasets" & Chr(34))
 
+        clsRemoveFunction.SetRCommand("rm")
+
         'set up the import data function
         clsImportFunction.SetRCommand(frmMain.clsRLink.strInstatDataObject & "$import_data")
 
@@ -138,10 +142,12 @@ Public Class dlgFromLibrary
             lstCollection.Visible = True
             cmdLibraryCollection.Visible = False
             ucrBase.clsRsyntax.AddToBeforeCodes(clsDataFunction)
+            ucrBase.clsRsyntax.AddToAfterCodes(clsRemoveFunction)
         Else
             lstCollection.Visible = False
             cmdLibraryCollection.Visible = True
             ucrBase.clsRsyntax.RemoveFromBeforeCodes(clsDataFunction)
+            ucrBase.clsRsyntax.RemoveFromAfterCodes(clsRemoveFunction)
         End If
         TestOkEnabled()
         EnableHelp()
@@ -229,13 +235,12 @@ Public Class dlgFromLibrary
     End Function
 
     Private Sub cmdHelp_Click(sender As Object, e As EventArgs) Handles cmdHelp.Click
-        Dim clsHelp As New RFunction
-        clsHelp.SetPackageName("utils")
-        clsHelp.SetRCommand("help")
-        clsHelp.AddParameter("topic", Chr(34) & lstCollection.SelectedItems(0).Text & Chr(34))
-        clsHelp.AddParameter("package", Chr(34) & ucrInputPackages.cboInput.SelectedItem & Chr(34))
-        clsHelp.AddParameter("help_type", Chr(34) & "html" & Chr(34))
-        frmMain.clsRLink.RunScript(clsHelp.ToScript, strComment:="Opening help page for" & " " & lstCollection.SelectedItems(0).Text & " " & "dataset. Generated from dialog Open Dataset from Library", iCallType:=2, bSeparateThread:=False, bUpdateGrids:=False)
+        Dim strPackageName As String = ucrInputPackages.cboInput.SelectedItem
+        Dim strTopic As String = lstCollection.SelectedItems(0).Text
+        If strPackageName <> "" AndAlso strTopic <> "" Then
+            Dim frmMaximiseOutput As New frmMaximiseOutput
+            frmMaximiseOutput.Show(strFileName:=clsFileUrlUtilities.GetHelpFileURL(strPackageName:=strPackageName, strTopic:=strTopic), bReplace:=False)
+        End If
     End Sub
 
     Private Sub ucrNewDataFrameName_ControlContentsChanged(ucrChangedControl As ucrCore) Handles ucrNewDataFrameName.ControlContentsChanged
@@ -267,8 +272,10 @@ Public Class dlgFromLibrary
 
         If strSelectedText.Contains("(") Then
             clsDataFunction.AddParameter("X", strDataNameFromBracket)
+            clsRemoveFunction.AddParameter("X", strDataNameFromBracket, bIncludeArgumentName:=False)
         Else
             clsDataFunction.AddParameter("X", strSelectedDataName)
+            clsRemoveFunction.AddParameter("X", strSelectedDataName, bIncludeArgumentName:=False)
         End If
 
         'calling RunInternalScriptGetOutput() twice because currently it can't execute multiple lines

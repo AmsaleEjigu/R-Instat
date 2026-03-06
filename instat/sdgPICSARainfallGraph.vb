@@ -94,9 +94,16 @@ Public Class sdgPICSARainfallGraph
     Private clsRaesFunction As New RFunction
     Private clsAsDate As New RFunction
     Private clsAsDateYLimit As New RFunction
-    Private clsAsNumeric As New RFunction
+    Private clsAsNumericX As New RFunction
+    Private clsAsNumericY As New RFunction
 
     Private clsGeomRug As New RFunction
+    Private clsSegmentAesFunction As New RFunction
+    Private clsAsDateYendFunction As New RFunction
+    Private clsPoint2AesFunction As New RFunction
+    Private bSlope As Boolean = False
+    Private bLine As Boolean = False
+
     Private Sub sdgPICSARainfallGraph_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         OpeningMode()
         autoTranslate(Me)
@@ -214,9 +221,8 @@ Public Class sdgPICSARainfallGraph
         ' Y-Axis
         ucrPnlYAxisType.AddRadioButton(rdoYNumeric)
         ucrPnlYAxisType.AddRadioButton(rdoYDate)
-        ucrPnlYAxisType.AddParameterValueFunctionNamesCondition(rdoYNumeric, "y", "as.Date", False)
-        ucrPnlYAxisType.AddParameterValueFunctionNamesCondition(rdoYDate, "y", "as.Date", True)
-
+        ucrPnlYAxisType.AddParameterValuesCondition(rdoYNumeric, "rdo_checked", "numeric")
+        ucrPnlYAxisType.AddParameterValuesCondition(rdoYDate, "rdo_checked", "date")
         ucrPnlYAxisType.AddToLinkedControls(ucrChkSpecifyYAxisTickMarks, {rdoYNumeric}, bNewLinkedHideIfParameterMissing:=True)
         ucrPnlYAxisType.AddToLinkedControls(ucrInputDateDisplayFormat, {rdoYDate}, bNewLinkedHideIfParameterMissing:=True, bNewLinkedChangeToDefaultState:=True, objNewDefaultState:="Day Month (1 Jan)")
         ucrPnlYAxisType.AddToLinkedControls(ucrChkSpecifyDateBreaks, {rdoYDate}, bNewLinkedHideIfParameterMissing:=True)
@@ -466,8 +472,8 @@ Public Class sdgPICSARainfallGraph
 
         ucrInputLabelXReg.SetDropDownStyleAsNonEditable()
         ucrInputLabelXReg.SetParameter(New RParameter("label.x.npc"))
-        dctLegendXPosition.Add("Middle", Chr(34) & "middle" & Chr(34))
         dctLegendXPosition.Add("Left", Chr(34) & "left" & Chr(34))
+        dctLegendXPosition.Add("Middle", Chr(34) & "middle" & Chr(34))
         dctLegendXPosition.Add("Centre", Chr(34) & "centre" & Chr(34))
         dctLegendXPosition.Add("Center", Chr(34) & "center" & Chr(34))
         dctLegendXPosition.Add("Right", 0.7)
@@ -476,18 +482,18 @@ Public Class sdgPICSARainfallGraph
 
         ucrInputLabelYReg.SetDropDownStyleAsNonEditable()
         ucrInputLabelYReg.SetParameter(New RParameter("label.y.npc"))
+        dctLegendYPosition.Add("Top", Chr(34) & "top" & Chr(34))
         dctLegendYPosition.Add("Middle", Chr(34) & "middle" & Chr(34))
         dctLegendYPosition.Add("Centre", Chr(34) & "centre" & Chr(34))
         dctLegendYPosition.Add("Center", Chr(34) & "center" & Chr(34))
-        dctLegendYPosition.Add("Top", Chr(34) & "top" & Chr(34))
         dctLegendYPosition.Add("Bottom", Chr(34) & "bottom" & Chr(34))
         ucrInputLabelYReg.SetItems(dctLegendYPosition)
         ucrInputLabelYReg.SetLinkedDisplayControl(lblLabelYReg)
 
         ucrInputLabelXCor.SetDropDownStyleAsNonEditable()
         ucrInputLabelXCor.SetParameter(New RParameter("label.x.npc"))
-        dctLegendXPositionSig.Add("Middle", Chr(34) & "middle" & Chr(34))
         dctLegendXPositionSig.Add("Left", Chr(34) & "left" & Chr(34))
+        dctLegendXPositionSig.Add("Middle", Chr(34) & "middle" & Chr(34))
         dctLegendXPositionSig.Add("Centre", Chr(34) & "centre" & Chr(34))
         dctLegendXPositionSig.Add("Center", Chr(34) & "center" & Chr(34))
         dctLegendXPositionSig.Add("Right", 0.7)
@@ -496,10 +502,10 @@ Public Class sdgPICSARainfallGraph
 
         ucrInputLabelYCor.SetDropDownStyleAsNonEditable()
         ucrInputLabelYCor.SetParameter(New RParameter("label.y.npc"))
+        dctLegendYPositionSig.Add("Top", Chr(34) & "top" & Chr(34))
         dctLegendYPositionSig.Add("Middle", Chr(34) & "middle" & Chr(34))
         dctLegendYPositionSig.Add("Centre", Chr(34) & "centre" & Chr(34))
         dctLegendYPositionSig.Add("Center", Chr(34) & "center" & Chr(34))
-        dctLegendYPositionSig.Add("Top", Chr(34) & "top" & Chr(34))
         dctLegendYPositionSig.Add("Bottom", Chr(34) & "bottom" & Chr(34))
         ucrInputLabelYCor.SetItems(dctLegendYPositionSig)
         ucrInputLabelYCor.SetLinkedDisplayControl(lblLabelYCor)
@@ -651,7 +657,7 @@ Public Class sdgPICSARainfallGraph
                         Optional clsNewGeomhlineMedian As RFunction = Nothing, Optional clsNewGeomhlineLowerTercile As RFunction = Nothing,
                         Optional clsNewGeomhlineUpperTercile As RFunction = Nothing, Optional clsNewRaesFunction As RFunction = Nothing,
                         Optional clsNewAsDate As RFunction = Nothing, Optional clsNewAsDateYLimit As RFunction = Nothing,
-                        Optional clsNewAsNumeric As RFunction = Nothing, Optional clsNewDatePeriodOperator As ROperator = Nothing,
+                        Optional clsNewAsNumericX As RFunction = Nothing, Optional clsNewDatePeriodOperator As ROperator = Nothing,
                         Optional clsNewGeomTextLabelMeanLine As RFunction = Nothing, Optional clsNewRoundMeanY As RFunction = Nothing,
                         Optional clsNewPasteMeanY As RFunction = Nothing, Optional clsNewGeomTextLabelMedianLine As RFunction = Nothing,
                         Optional clsNewRoundMedianY As RFunction = Nothing, Optional clsNewPasteMedianY As RFunction = Nothing,
@@ -663,7 +669,9 @@ Public Class sdgPICSARainfallGraph
                         Optional clsNewUpperTercileFunction As RFunction = Nothing, Optional clsNewAsDateMeanY As RFunction = Nothing, Optional clsNewAsDateMedianY As RFunction = Nothing,
                         Optional clsNewAsDateLowerTercileY As RFunction = Nothing, Optional clsNewAsDateUpperTercileY As RFunction = Nothing, Optional clsNewFormatMeanY As RFunction = Nothing,
                         Optional clsNewFormatMedianY As RFunction = Nothing, Optional clsNewFormatLowerTercileY As RFunction = Nothing,
-                        Optional clsNewFormatUpperTercileY As RFunction = Nothing, Optional clsNewDummyFunction As RFunction = Nothing, Optional bReset As Boolean = False)
+                        Optional clsNewFormatUpperTercileY As RFunction = Nothing, Optional clsNewDummyFunction As RFunction = Nothing,
+                        Optional clsNewAsNumericY As RFunction = Nothing, Optional clsNewSegmentAes As RFunction = Nothing,
+                        Optional clsNewAsDateYend As RFunction = Nothing, Optional clsNewPoint2AesFunction As RFunction = Nothing, Optional bReset As Boolean = False)
         Dim clsCLimitsY As RFunction
 
         bRCodeSet = False
@@ -710,6 +718,9 @@ Public Class sdgPICSARainfallGraph
         clsRoundUpperTercileY = clsNewRoundUpperTercileY
         clsPasteUpperTercileY = clsNewPasteUpperTercileY
         clsFormatUpperTercileY = clsNewFormatUpperTercileY
+        clsSegmentAesFunction = clsNewSegmentAes
+        clsAsDateYendFunction = clsNewAsDateYend
+        clsPoint2AesFunction = clsNewPoint2AesFunction
 
         clsStatRegEquationFunction = clsNewStatRegEquation
         clsStatsCorFunction = clsNewStatsCorFunction
@@ -783,8 +794,9 @@ Public Class sdgPICSARainfallGraph
         clsRaesFunction = clsNewRaesFunction
 
         clsAsDate = clsNewAsDate
-        clsAsNumeric = clsNewAsNumeric
+        clsAsNumericX = clsNewAsNumericX
 
+        clsAsNumericY = clsNewAsNumericY
         clsAsDateYLimit = clsNewAsDateYLimit
 
         clsDatePeriodOperator = clsNewDatePeriodOperator
@@ -843,7 +855,7 @@ Public Class sdgPICSARainfallGraph
             clsCLimitsYDate.AddParameter("upperlimit", "NA", bIncludeArgumentName:=False, iPosition:=1)
         End If
 
-        ucrPnlYAxisType.SetRCode(clsRaesFunction, bReset, bCloneIfNeeded:=True)
+        ucrPnlYAxisType.SetRCode(clsDummyFunction, bReset, bCloneIfNeeded:=True)
 
         'This is needed to set the R code correctly for ucrChkYSpecifyLowerLimit/ucrChkYSpecifyUpperLimit
         'since used by both continuous and date scales
@@ -956,6 +968,7 @@ Public Class sdgPICSARainfallGraph
         ucrInputStartMonth.AddAdditionalCodeParameterPair(clsAsDateMedianY, New RParameter("origin", 1), iAdditionalPairNo:=2)
         ucrInputStartMonth.AddAdditionalCodeParameterPair(clsAsDateLowerTercileY, New RParameter("origin", 1), iAdditionalPairNo:=3)
         ucrInputStartMonth.AddAdditionalCodeParameterPair(clsAsDateUpperTercileY, New RParameter("origin", 1), iAdditionalPairNo:=4)
+        ucrInputStartMonth.AddAdditionalCodeParameterPair(clsAsDateYendFunction, New RParameter("origin", 1), iAdditionalPairNo:=5)
 
         ucrInputStartMonth.SetRCode(clsAsDate, bReset, bCloneIfNeeded:=True)
 
@@ -1068,6 +1081,10 @@ Public Class sdgPICSARainfallGraph
         Else
             clsPipeOperator.RemoveParameterByName("mutate")
         End If
+
+        If ucrChkAddMean.Checked Then ucrChkAddMeanLabel.Checked = True
+        If ucrChkAddMedian.Checked Then ucrChkAddMedianLabel.Checked = True
+        If ucrChkAddTerciles.Checked Then ucrChkAddTercilesLabel.Checked = True
     End Sub
 
 
@@ -1296,7 +1313,11 @@ Public Class sdgPICSARainfallGraph
     Private Sub AddRemoveYAxisScales()
         If bRCodeSet Then
             If rdoYNumeric.Checked Then
-                clsRaesFunction.AddParameter("y", clsRFunctionParameter:=clsAsNumeric, iPosition:=1)
+                clsDummyFunction.AddParameter("rdo_checked", "numeric", iPosition:=2)
+                clsRaesFunction.AddParameter("y", clsRFunctionParameter:=clsAsNumericY, iPosition:=1)
+                clsSegmentAesFunction.AddParameter("y", dlgPICSARainfall.ucrReceiverForPICSA.GetVariableNames(bWithQuotes:=False), iPosition:=1)
+                clsSegmentAesFunction.AddParameter("yend", dlgPICSARainfall.ucrReceiverSecondYVar.GetVariableNames(bWithQuotes:=False), iPosition:=2)
+                clsPoint2AesFunction.AddParameter("y", dlgPICSARainfall.ucrReceiverSecondYVar.GetVariableNames(bWithQuotes:=False), iPosition:=1)
                 If clsYScaleContinuousFunction.iParameterCount > 0 Then
                     clsBaseOperator.AddParameter("scale_y_continuous", clsRFunctionParameter:=clsYScaleContinuousFunction)
                 Else
@@ -1304,17 +1325,17 @@ Public Class sdgPICSARainfallGraph
                 End If
                 clsBaseOperator.RemoveParameterByName("scale_y_date")
             ElseIf rdoYDate.Checked Then
+                clsDummyFunction.AddParameter("rdo_checked", "date", iPosition:=2)
                 clsRaesFunction.AddParameter("y", clsRFunctionParameter:=clsAsDate, iPosition:=1)
+                clsSegmentAesFunction.AddParameter("y", clsRFunctionParameter:=clsAsDate, iPosition:=1)
+                clsSegmentAesFunction.AddParameter("yend", clsRFunctionParameter:=clsAsDateYendFunction, iPosition:=2)
+                clsPoint2AesFunction.AddParameter("y", clsRFunctionParameter:=clsAsDateYendFunction, iPosition:=1)
                 If clsYScaleDateFunction.iParameterCount > 0 Then
                     clsBaseOperator.AddParameter("scale_y_date", clsRFunctionParameter:=clsYScaleDateFunction)
                 Else
                     clsBaseOperator.RemoveParameterByName("scale_y_date")
                 End If
                 clsBaseOperator.RemoveParameterByName("scale_y_continuous")
-            Else
-                clsRaesFunction.AddParameter("y", clsRFunctionParameter:=clsAsNumeric, iPosition:=1)
-                clsBaseOperator.RemoveParameterByName("scale_y_continuous")
-                clsBaseOperator.RemoveParameterByName("scale_y_date")
             End If
         End If
     End Sub
@@ -1379,17 +1400,31 @@ Public Class sdgPICSARainfallGraph
     Private Sub OpeningMode()
         Dim tbPageSlope As TabPage = tbSlope
         Dim tbPageLines As TabPage = tpLines
-        tbPICSA.TabPages.Remove(tbSlope)
-        tbPICSA.TabPages.Remove(tpLines)
 
         Select Case dlgPICSARainfall.enumPICSAMode
             Case dlgPICSARainfall.PICSAMode.Temperature
-                tbPICSA.TabPages.Add(tbPageSlope)
+                tbPICSA.TabPages.Remove(tpLines)
+                If Not bSlope AndAlso Not tbPICSA.TabPages.Contains(tbPageSlope) Then
+                    tbPICSA.TabPages.Add(tbPageSlope)
+                    bSlope = True
+                    bLine = False
+                End If
             Case dlgPICSARainfall.PICSAMode.Rainfall
-                tbPICSA.TabPages.Add(tbPageLines)
+                tbPICSA.TabPages.Remove(tbSlope)
+                If Not bLine AndAlso Not tbPICSA.TabPages.Contains(tbPageLines) Then
+                    tbPICSA.TabPages.Add(tbPageLines)
+                    bLine = True
+                    bSlope = False
+                End If
             Case dlgPICSARainfall.PICSAMode.General
-                tbPICSA.TabPages.Add(tbPageLines)
-                tbPICSA.TabPages.Add(tbPageSlope)
+                tbPICSA.TabPages.Remove(tpLines)
+                tbPICSA.TabPages.Remove(tbSlope)
+                If Not tbPICSA.TabPages.Contains(tbPageSlope) Then
+                    tbPICSA.TabPages.Add(tbPageLines)
+                End If
+                If Not tbPICSA.TabPages.Contains(tbPageSlope) Then
+                    tbPICSA.TabPages.Add(tbPageSlope)
+                End If
         End Select
     End Sub
 
